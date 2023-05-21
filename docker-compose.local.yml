@@ -1,0 +1,97 @@
+version: '3.6'
+services:
+
+  adapter:
+    platform: linux/amd64
+    container_name: redis-adapter
+    build:
+      context: ./
+      dockerfile: Dockerfile.local
+      args:
+        SSH_PRV_KEY: ${SSH_PRV_KEY}
+    ports:
+      - 3200:3000
+    env_file:
+      - ./.env.Local
+    entrypoint:
+      - sh
+      - -c
+      - "sh entrypoint.local.sh"
+    volumes:
+      - ./:/var/www/nest/redis-adapter
+      - dependencies-redis-adapter:/var/www/nest/redis-adapter/node_modules
+    depends_on:
+      - redis
+    tty: true
+    restart: always
+
+  # -----------------------------------------------
+  # Ecosystem(s)
+
+  redis:
+    container_name: redis
+    image: redis
+    ports:
+      - 3279:6379
+    volumes:
+      - ./redis:/data
+    restart: always
+
+  # -----------------------------------------------
+  # Mock
+
+  emitter:
+    platform: linux/amd64
+    container_name: mock-emitter
+    build:
+      context: ./test/emitter
+      dockerfile: Dockerfile
+    ports:
+      - 3100:3000
+    env_file:
+      - ./.env.Local
+    entrypoint:
+      - sh
+      - -c
+      - "sh entrypoint.local.sh"
+    volumes:
+      - ./test/emitter:/var/www/nest/emitter
+      - dependencies-mock-emitter:/var/www/nest/emitter/node_modules
+    depends_on:
+      - redis
+    tty: true
+    restart: always
+
+  listener:
+    platform: linux/amd64
+    container_name: mock-client
+    build:
+      context: ./test/listener
+      dockerfile: Dockerfile
+    ports:
+      - 2900:3000
+    environment:
+      - WS_HOST=adapter
+      - WS_PORT=3000
+    volumes:
+      - ./test/listener:/var/www/nest/client
+      - dependencies-mock-client:/var/www/nest/client/node_modules
+    tty: true
+    restart: always
+
+  # -----------------------------------------------
+  # Worker(s)
+
+  # ...
+
+volumes:
+  dependencies-redis-adapter:
+  dependencies-mock-emitter:
+  dependencies-mock-client:
+  # dependencies-instant-worker1:
+  # dependencies-instant-worker2:
+  # dependencies-instant-worker3:
+
+networks:
+  default:
+    driver: bridge

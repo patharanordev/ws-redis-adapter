@@ -1,0 +1,31 @@
+FROM node:18-alpine
+
+# # Use the node user from the image (instead of the root user)
+# USER node
+
+# Create app directory
+WORKDIR /var/www/nest/redis-adapter
+
+# For using openssh access to private repo/libs
+ARG SSH_PRV_KEY
+RUN apk add -qU openssh git redis
+RUN mkdir /root/.ssh && \
+    chmod 0700 /root/.ssh && \
+    ssh-keyscan -t rsa bitbucket.org >> /root/.ssh/known_hosts && \
+    echo "$SSH_PRV_KEY" > /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa && \
+    npm i -g pnpm
+
+# Copy application dependency manifests to the container image.
+# A wildcard is used to ensure copying both package.json AND package-lock.json (when available).
+# Copying this first prevents re-running npm install on every code change.
+# COPY --chown=node:node package*.json ./
+COPY package*.json ./
+
+# Install app dependencies using the `npm ci` command instead of `npm install`
+RUN pnpm i
+RUN apk del openssh git
+
+# Bundle app source
+# COPY --chown=node:node . .
+COPY . .
